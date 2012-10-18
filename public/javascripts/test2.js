@@ -35,7 +35,10 @@
     if (count > 1) {
       console.log(count);
       console.log("I'm last guy in the house");
-      offer = pc1.createOffer(null);
+      offer = pc1.createOffer({
+        video: true,
+        audio: true
+      });
       pc1.setLocalDescription(pc1.SDP_OFFER, offer);
       return channel.trigger("client-offer", {
         offer: offer.toSdp()
@@ -48,7 +51,8 @@
   };
 
   navigator.getUserMedia({
-    video: true
+    video: true,
+    audio: true
   }, videoSuccess, videoFail);
 
   startStreaming = function() {
