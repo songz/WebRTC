@@ -6,7 +6,7 @@ count = 0
 
 iceCallback1 = (candidate, b)->
   if (candidate)
-    pc1.processIceMessage(candidate)
+    channel.trigger("client-signal", {label:candidate.label, candidate:candidate.toSdp()})
 pc1 = new webkitPeerConnection00 "STUN stun.l.google.com:19302", iceCallback1
 
 onRemoteStreamAdded = (event) ->
@@ -50,3 +50,6 @@ channel.bind "client-offer", (data)->
   pc1.setLocalDescription( pc1.SDP_ANSWER, answer )
   channel.trigger("client-answer", {answer: answer.toSdp()})
   pc1.startIce()
+channel.bind "client-signal", (data)->
+  candidate = new IceCandidate( data.label, data.candidate )
+  pc1.processIceMessage( candidate )

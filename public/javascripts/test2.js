@@ -12,7 +12,10 @@
 
   iceCallback1 = function(candidate, b) {
     if (candidate) {
-      return pc1.processIceMessage(candidate);
+      return channel.trigger("client-signal", {
+        label: candidate.label,
+        candidate: candidate.toSdp()
+      });
     }
   };
 
@@ -83,6 +86,12 @@
       answer: answer.toSdp()
     });
     return pc1.startIce();
+  });
+
+  channel.bind("client-signal", function(data) {
+    var candidate;
+    candidate = new IceCandidate(data.label, data.candidate);
+    return pc1.processIceMessage(candidate);
   });
 
 }).call(this);
