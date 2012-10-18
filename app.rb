@@ -2,10 +2,19 @@ require 'rubygems'
 require 'sinatra'
 
 get '/' do
-  File.read(File.join('public', 'index.html'))
+  erb :index
 end
 
-get '/main' do
-  @name = "Song Zheng"
-  erb :main
+get '/subscriber' do
+  erb :subscriber
+end
+
+def printa a
+  p "========"
+  p "========"
+  p "========"
+  p a
+  p "========"
+  p "========"
+  p "========"
 end
