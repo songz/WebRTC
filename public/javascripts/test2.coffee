@@ -20,7 +20,7 @@ videoSuccess = (localMediaStream) ->
   if count > 1
     console.log count
     console.log "I'm last guy in the house"
-    offer = pc1.createOffer({audio:true, video:true})
+    offer = pc1.createOffer(null)
     pc1.setLocalDescription(pc1.SDP_OFFER, offer)
     channel.trigger("client-offer", {offer: offer.toSdp()})
 videoFail = (error) ->
