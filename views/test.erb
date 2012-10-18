@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>PeerConnection Demo 1</title>
+<style>
+video {
+  border:5px solid black;
+  width:480px;
+  height:360px;
+}
+button {
+  font: 18px sans-serif;
+  padding: 8px;
+}
+textarea {
+  font-family: monospace;
+  margin: 2px;
+  width:480px;
+  height:640px;
+}
+</style>
+</head>
+<body>
+<video id="vid1" autoplay></video>
+<video id="vid2" autoplay></video>
+<br>
+<button id="btn1" onclick="start()">Start</button>
+<button id="btn2" onclick="call()">Call</button>
+<button id="btn3" onclick="hangup()">Hang Up</button>
+<br>
+<xtextarea id="ta1"></textarea>
+<xtextarea id="ta2"></textarea>
+<script>
+btn1.disabled = false;
+btn2.disabled = true;
+btn3.disabled = true;
+var pc1,pc2;
+var localstream;
+
+function gotStream(stream){
+  vid1.src = webkitURL.createObjectURL(stream);
+  localstream = stream;
+  btn2.disabled = false;
+}
+
+function start() {
+  btn1.disabled = true;
+  navigator.webkitGetUserMedia({audio:true, video:true},
+                               gotStream, function() {});
+}  
+  
+function call() {
+  btn2.disabled = true;
+  btn3.disabled = false;
+
+  pc1 = new webkitPeerConnection00("STUN stun.l.google.com:19302", iceCallback1)
+  pc2 = new webkitPeerConnection00("STUN stun.l.google.com:19302", iceCallback2)
+  pc2.onaddstream = gotRemoteStream; 
+
+  pc1.addStream(localstream);
+  var offer = pc1.createOffer(null);
+  pc1.setLocalDescription(pc1.SDP_OFFER, offer);
+  data = {}
+  data.offer = offer.toSdp();
+  var answer = pc2.createAnswer(data.offer, {has_audio:true, has_video:true});
+  pc2.setRemoteDescription(pc2.SDP_OFFER, new SessionDescription(data.offer));
+  pc2.setLocalDescription(pc2.SDP_ANSWER, answer);
+  data.answer = answer.toSdp();
+  pc1.setRemoteDescription(pc1.SDP_ANSWER, new SessionDescription(data.answer) );
+  pc1.startIce();
+  pc2.startIce();
+}
+
+function hangup() {
+  pc1.close(); 
+  pc2.close();
+  pc1 = null;
+  pc2 = null;
+  btn3.disabled = true;
+  btn2.disabled = false;
+}
+
+function gotRemoteStream(e){
+  vid2.src = webkitURL.createObjectURL(e.stream);
+}
+
+function iceCallback1(candidate,bMore){
+  if (candidate) {
+    pc2.processIceMessage(candidate);
+  }
+}
+      
+function iceCallback2(candidate,bMore){
+  if (candidate) {
+    pc1.processIceMessage(candidate);
+  }
+}
+</script>
+</body>
+</html>

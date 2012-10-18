@@ -8,7 +8,10 @@
 
   offer = "";
 
-  iceCallback1 = function() {
+  iceCallback1 = function(candidate, b) {
+    if (candidate) {
+      pc1.processIceMessage(candidate);
+    }
     return console.log("iceCallback");
   };
 
@@ -68,6 +71,7 @@
   });
 
   channel.bind("client-answer", function(data) {
+    console.log(data.answer);
     pc1.setRemoteDescription(pc1.SDP_ANSWER, new SessionDescription(data.answer));
     return pc1.startIce();
   });

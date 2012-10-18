@@ -3,7 +3,9 @@ window.URL = window.URL || window.webkitURL
 
 offer = ""
 
-iceCallback1 = ->
+iceCallback1 = (candidate, b)->
+  if (candidate)
+    pc1.processIceMessage(candidate)
   console.log "iceCallback"
 pc1 = new webkitPeerConnection00("STUN stun.l.google.com:19302", iceCallback1)
 
@@ -40,6 +42,7 @@ channel.bind 'pusher:subscription_succeeded', ->
   count = channel.members.count
 
 channel.bind "client-answer", (data)->
+  console.log data.answer
   pc1.setRemoteDescription( pc1.SDP_ANSWER, new SessionDescription(data.answer) )
   pc1.startIce()
 channel.bind "client-offer", (data)->
