@@ -3,16 +3,142 @@
 <head>
 	<meta charset="UTF-8">
 	<title>A simple static page</title>
-	<link rel="stylesheet" href="stylesheets/bootstrap.min.css" />
-	<link rel="stylesheet" href="stylesheets/app.css" />
-	<script type="text/javascript" src="javascripts/jquery1.7.1.js"></script>
-	<script type="text/javascript" src="javascripts/bootstrap.min.js"></script>
+  <script src="http://code.jquery.com/jquery-1.8.2.min.js" type="text/javascript"></script>
   <script src="http://js.pusher.com/1.12/pusher.min.js" type="text/javascript"></script>
 </head>
 <body>
   <video id="myVid" src="" autoplay=true width="320" height="240"></video>
+  <hr />
   <video id="otherVid" src="" autoplay=true width="320" height="240"></video>
 	
-  <script src="javascripts/app.js" type="text/javascript"></script>
+
+  <script type="text/javascript">
+    // Normalizers. Market is fragmented, every browser has their own prefix. 
+    // Define variables without browser prefix so we can reuse the code later on
+    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+    window.URL = window.URL || window.webkitURL;
+
+    // ************* 
+    // ************* 
+    // ***** Setting up P2P variables *****
+    // ***** Client will send messages to everyone else by triggering events *****
+    // ************* 
+    // ************* 
+    // Between p2p connections, p2p messages need to be sent (stream metadata, etc)
+    // iceCallback is executed whenever there is a p2p state change
+    // p2p messages will be broadcasted to everyone by triggering 'client-signal' event
+    function iceCallback(candidate, b){
+      if (candidate)
+        channel.trigger("client-signal", {label:candidate.label, candidate:candidate.toSdp()} );
+    };
+
+    // Use Google's Stun servers to establish P2P protocol
+    // Create P2P object, and set iceCallback as callback for p2p messaging
+    var pc1 = new webkitPeerConnection00("STUN stun.l.google.com:19302", iceCallback);
+
+    // When p2p connection gets a new stream (from the remote guy), execute a function
+    // This function will just set the url of the Video element
+    pc1.onaddstream = function(event){
+      var url = webkitURL.createObjectURL(event.stream);
+      $('#otherVid').attr('src', url);
+    }
+
+    
+    // ************* 
+    // ************* 
+    // ***** Get Access to Web Camera *****
+    // ************* 
+    // ************* 
+    // Event Handler: We have successfully acquired webcam video/audio feed
+    // Set Video's source to url of the video feed
+    // Add Stream to p2p connection
+    // If I'm the second person to join, generate an offer and send to other client
+    // Since I'm generating the offer, the offer will be local P2P description
+    // Send my offer to the other guy by triggering 'client-offer' event
+    function videoSuccess(localMediaStream){
+      $('#myVid').attr( 'src', window.URL.createObjectURL(localMediaStream) );
+      pc1.addStream(localMediaStream);
+      if(count > 1){
+        var offer = pc1.createOffer({video:true, audio:true});
+        pc1.setLocalDescription(pc1.SDP_OFFER, offer);
+        channel.trigger("client-offer", {offer: offer.toSdp()});
+      }
+    }
+    
+    // If video/audio cannot be acquired, print out error
+    function videoFail(error){
+      console.log(error);
+    }
+    
+    // Get User's Audio and Video Feed, execute videoSuccess and videoFailure as needed
+    navigator.getUserMedia({video: true, audio:true}, videoSuccess, videoFail);
+
+
+    // ************* 
+    // ************* 
+    // ***** Setting up Communication between users on the same page *****
+    // ***** Client will send messages to everyone else by triggering events *****
+    // ************* 
+    // ************* 
+    // Count Keeps track of how many users there are in a room.
+    // Second user will send offer request and try to connect to first user
+    var count;
+
+    // Define Pusher Constants, used to trigger events to everyone in the same channel
+    Pusher.channel_auth_transport = 'jsonp';
+    // Using Pusher's presence API, I can keep track of how many people are currently online
+    Pusher.channel_auth_endpoint = 'http://pusherpresence.herokuapp.com/pusher/auth';
+    pusher = new Pusher('9e96f2d1617cc3aa954f'); // This is my key. Please do not abuse it
+
+    // Subscribe to the channel
+    var channel = pusher.subscribe('presence-<%= @id %>');
+
+    // Bind to Channel Event: Successfully subscribed to channel
+    // Update count to reflect how many people are currently in the room
+    // If there are more than 2 people in the room, redirect to a new room
+    channel.bind('pusher:subscription_succeeded', function(){
+      count = channel.members.count;
+      if(count>2)
+        window.location="/";
+    });
+
+    // Bind to Channel Event: Offer received
+    // If I'm the first person in the room and someone else joins,
+    // He will trigger a 'client-offer' event and I need to give him an answer
+    // Since I'm generating an answer, the answer will be local P2P description
+    // Since the offer came remotely, the offer will be remote P2P description
+    // I now have local and remote sessions, I can start p2p connection
+    // After generating an answer, I trigger a 'client-answer' event
+    channel.bind("client-offer", function(data){
+      var answer = pc1.createAnswer( data.offer, {has_audio:true, has_video:true});
+      pc1.setRemoteDescription( pc1.SDP_OFFER, new SessionDescription(data.offer) );
+      pc1.setLocalDescription( pc1.SDP_ANSWER, answer );
+      pc1.startIce();
+      channel.trigger("client-answer", {answer: answer.toSdp()});
+    });
+
+    // Bind to Channel Event: Answer Received
+    // If I was the second person in the room, I would generate an offer (later in code)
+    // Send the offer by triggering a client-offer event.
+    // The first person will receive my offer and generate a corresponding answer
+    // When first person triggers 'client-answer' event, this event will execute
+    // Since I'm generating an offer, the offer will be local P2P description
+    // Since the answer came remotely, the answer will be remote P2P description
+    // I now have local and remote sessions, I can start p2p connection
+    channel.bind("client-answer", function(data){
+      pc1.setRemoteDescription( pc1.SDP_ANSWER, new SessionDescription(data.answer) );
+      pc1.startIce();
+    });
+
+    // After both parties start p2p connection, they need to send stream messages to each other.
+    // To do this, they will trigger 'client-signals' to each other with the p2p data
+    // The receiver of client-signals will processIceMessage accordingly
+    channel.bind("client-signal", function(data){
+      var candidate = new IceCandidate( data.label, data.candidate );
+      pc1.processIceMessage( candidate );
+    });
+
+
+  </script>
 </body>
 </html>

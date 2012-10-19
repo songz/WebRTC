@@ -2,27 +2,10 @@ require 'rubygems'
 require 'sinatra'
 
 get '/' do
+  redirect "/#{Time.now.to_i}"
+end
+
+get '/:id' do
+  @id = params[:id]
   erb :index
-end
-
-get '/subscriber' do
-  erb :subscriber
-end
-
-get '/test' do
-  erb :test
-end
-
-get '/test2' do
-  erb :test2
-end
-
-def printa a
-  p "========"
-  p "========"
-  p "========"
-  p a
-  p "========"
-  p "========"
-  p "========"
 end
